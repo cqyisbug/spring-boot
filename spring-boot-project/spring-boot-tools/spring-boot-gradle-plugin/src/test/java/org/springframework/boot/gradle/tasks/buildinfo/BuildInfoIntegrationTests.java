@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,8 @@ import org.gradle.testkit.runner.InvalidRunnerConfigurationException;
 import org.gradle.testkit.runner.TaskOutcome;
 import org.gradle.testkit.runner.UnexpectedBuildFailure;
 import org.junit.jupiter.api.TestTemplate;
-import org.junit.jupiter.api.extension.ExtendWith;
 
-import org.springframework.boot.gradle.junit.GradleCompatibilityExtension;
+import org.springframework.boot.gradle.junit.GradleCompatibility;
 import org.springframework.boot.gradle.testkit.GradleBuild;
 import org.springframework.boot.loader.tools.FileUtils;
 
@@ -39,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Andy Wilkinson
  */
-@ExtendWith(GradleCompatibilityExtension.class)
+@GradleCompatibility
 class BuildInfoIntegrationTests {
 
 	GradleBuild gradleBuild;
@@ -64,7 +63,7 @@ class BuildInfoIntegrationTests {
 		assertThat(buildInfoProperties).containsEntry("build.group", "foo");
 		assertThat(buildInfoProperties).containsEntry("build.additional", "foo");
 		assertThat(buildInfoProperties).containsEntry("build.name", "foo");
-		assertThat(buildInfoProperties).containsEntry("build.version", "1.0");
+		assertThat(buildInfoProperties).containsEntry("build.version", "0.1.0");
 	}
 
 	@TestTemplate

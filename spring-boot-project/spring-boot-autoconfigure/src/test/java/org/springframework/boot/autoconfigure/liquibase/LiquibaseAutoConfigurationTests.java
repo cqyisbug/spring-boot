@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.boot.DefaultBootstrapContext;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.jdbc.EmbeddedDataSourceConfiguration;
@@ -45,6 +46,7 @@ import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfigurat
 import org.springframework.boot.context.event.ApplicationStartingEvent;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.boot.liquibase.LiquibaseServiceLocatorApplicationListener;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.ContextConsumer;
@@ -54,6 +56,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,17 +72,18 @@ import static org.assertj.core.api.Assertions.contentOf;
  * @author Dominic Gunn
  * @author András Deák
  * @author Andrii Hrytsiuk
+ * @author Ferenc Gratzer
  */
 @ExtendWith(OutputCaptureExtension.class)
 class LiquibaseAutoConfigurationTests {
 
 	@BeforeEach
 	void init() {
-		new LiquibaseServiceLocatorApplicationListener()
-				.onApplicationEvent(new ApplicationStartingEvent(new SpringApplication(Object.class), new String[0]));
+		new LiquibaseServiceLocatorApplicationListener().onApplicationEvent(new ApplicationStartingEvent(
+				new DefaultBootstrapContext(), new SpringApplication(Object.class), new String[0]));
 	}
 
-	private ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 			.withConfiguration(AutoConfigurations.of(LiquibaseAutoConfiguration.class))
 			.withPropertyValues("spring.datasource.generate-unique-name=true");
 
@@ -99,6 +103,18 @@ class LiquibaseAutoConfigurationTests {
 	}
 
 	@Test
+	void createsDataSourceWhenSpringJdbcOnlyAvailableWithNoDataSourceBeanAndLiquibaseUrl() {
+		this.contextRunner.withPropertyValues("spring.liquibase.url:jdbc:hsqldb:mem:liquibase")
+				.withClassLoader(new FilteredClassLoader("org.apache.tomcat", "com.zaxxer.hikari",
+						"org.apache.commons.dbcp2", "oracle.ucp.jdbc"))
+				.run(assertLiquibase((liquibase) -> {
+					DataSource dataSource = liquibase.getDataSource();
+					assertThat(dataSource).isInstanceOf(SimpleDriverDataSource.class);
+					assertThat(((SimpleDriverDataSource) dataSource).getUrl()).isEqualTo("jdbc:hsqldb:mem:liquibase");
+				}));
+	}
+
+	@Test
 	void defaultSpringLiquibase() {
 		this.contextRunner.withUserConfiguration(EmbeddedDataSourceConfiguration.class)
 				.run(assertLiquibase((liquibase) -> {
@@ -106,6 +122,7 @@ class LiquibaseAutoConfigurationTests {
 					assertThat(liquibase.getContexts()).isNull();
 					assertThat(liquibase.getDefaultSchema()).isNull();
 					assertThat(liquibase.isDropFirst()).isFalse();
+					assertThat(liquibase.isClearCheckSums()).isFalse();
 				}));
 	}
 
@@ -143,6 +160,7 @@ class LiquibaseAutoConfigurationTests {
 					assertThat(liquibase.getDatabaseChangeLogLockTable())
 							.isEqualTo(properties.getDatabaseChangeLogLockTable());
 					assertThat(liquibase.isDropFirst()).isEqualTo(properties.isDropFirst());
+					assertThat(liquibase.isClearCheckSums()).isEqualTo(properties.isClearChecksums());
 					assertThat(liquibase.isTestRollbackOnUpdate()).isEqualTo(properties.isTestRollbackOnUpdate());
 				}));
 	}
@@ -187,6 +205,13 @@ class LiquibaseAutoConfigurationTests {
 		this.contextRunner.withUserConfiguration(EmbeddedDataSourceConfiguration.class)
 				.withPropertyValues("spring.liquibase.drop-first:true")
 				.run(assertLiquibase((liquibase) -> assertThat(liquibase.isDropFirst()).isTrue()));
+	}
+
+	@Test
+	void overrideClearChecksums() {
+		this.contextRunner.withUserConfiguration(EmbeddedDataSourceConfiguration.class)
+				.withPropertyValues("spring.liquibase.clear-checksums:true")
+				.run(assertLiquibase((liquibase) -> assertThat(liquibase.isClearCheckSums()).isTrue()));
 	}
 
 	@Test
@@ -341,6 +366,13 @@ class LiquibaseAutoConfigurationTests {
 					BeanDefinition beanDefinition = context.getBeanFactory().getBeanDefinition("jdbcTemplate");
 					assertThat(beanDefinition.getDependsOn()).containsExactly("springLiquibase");
 				});
+	}
+
+	@Test
+	void overrideTag() {
+		this.contextRunner.withUserConfiguration(EmbeddedDataSourceConfiguration.class)
+				.withPropertyValues("spring.liquibase.tag:1.0.0")
+				.run(assertLiquibase((liquibase) -> assertThat(liquibase.getTag()).isEqualTo("1.0.0")));
 	}
 
 	private ContextConsumer<AssertableApplicationContext> assertLiquibase(Consumer<SpringLiquibase> consumer) {
