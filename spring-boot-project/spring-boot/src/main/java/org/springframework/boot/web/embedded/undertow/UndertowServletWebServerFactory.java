@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EventListener;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,6 +48,7 @@ import io.undertow.server.session.SessionManager;
 import io.undertow.servlet.Servlets;
 import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.DeploymentManager;
+import io.undertow.servlet.api.ListenerInfo;
 import io.undertow.servlet.api.MimeMapping;
 import io.undertow.servlet.api.ServletContainerInitializerInfo;
 import io.undertow.servlet.api.ServletStackTraces;
@@ -248,7 +250,8 @@ public class UndertowServletWebServerFactory extends AbstractServletWebServerFac
 	 * Return if filters should be initialized eagerly.
 	 * @return {@code true} if filters are initialized eagerly, otherwise {@code false}.
 	 * @since 2.0.0
-	 * @deprecated since 2.4.0 in favor of {@link #isEagerFilterInit()}
+	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
+	 * {@link #isEagerFilterInit()}
 	 */
 	@Deprecated
 	public boolean isEagerInitFilters() {
@@ -260,7 +263,8 @@ public class UndertowServletWebServerFactory extends AbstractServletWebServerFac
 	 * @param eagerInitFilters {@code true} if filters are initialized eagerly, otherwise
 	 * {@code false}.
 	 * @since 2.0.0
-	 * @deprecated since 2.4.0 in favor of {@link #isEagerFilterInit()}
+	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
+	 * {@link #isEagerFilterInit()}
 	 */
 	@Deprecated
 	public void setEagerInitFilters(boolean eagerInitFilters) {
@@ -330,6 +334,7 @@ public class UndertowServletWebServerFactory extends AbstractServletWebServerFac
 		deployment.setEagerFilterInit(this.eagerFilterInit);
 		deployment.setPreservePathOnForward(this.preservePathOnForward);
 		configureMimeMappings(deployment);
+		configureWebListeners(deployment);
 		for (UndertowDeploymentInfoCustomizer customizer : this.deploymentInfoCustomizers) {
 			customizer.customize(deployment);
 		}
@@ -348,6 +353,22 @@ public class UndertowServletWebServerFactory extends AbstractServletWebServerFac
 		int sessionTimeout = (isZeroOrLess(timeoutDuration) ? -1 : (int) timeoutDuration.getSeconds());
 		sessionManager.setDefaultSessionTimeout(sessionTimeout);
 		return manager;
+	}
+
+	private void configureWebListeners(DeploymentInfo deployment) {
+		for (String className : getWebListenerClassNames()) {
+			try {
+				deployment.addListener(new ListenerInfo(loadWebListenerClass(className)));
+			}
+			catch (ClassNotFoundException ex) {
+				throw new IllegalStateException("Failed to load web listener class '" + className + "'", ex);
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private Class<? extends EventListener> loadWebListenerClass(String className) throws ClassNotFoundException {
+		return (Class<? extends EventListener>) getServletClassLoader().loadClass(className);
 	}
 
 	private boolean isZeroOrLess(Duration timeoutDuration) {

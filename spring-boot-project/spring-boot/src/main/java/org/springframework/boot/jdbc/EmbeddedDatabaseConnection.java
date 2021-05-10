@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,8 @@ public enum EmbeddedDatabaseConnection {
 
 	/**
 	 * HSQL Database Connection.
-	 * @deprecated since 2.4.0 in favor of {@link EmbeddedDatabaseConnection#HSQLDB}.
+	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
+	 * {@link EmbeddedDatabaseConnection#HSQLDB}.
 	 */
 	@Deprecated
 	HSQL(EmbeddedDatabaseType.HSQL, DatabaseDriver.HSQLDB.getDriverClassName(), "org.hsqldb.jdbcDriver",
@@ -140,7 +141,8 @@ public enum EmbeddedDatabaseConnection {
 	 * database type.
 	 * @param driverClass the driver class
 	 * @return true if the driver class is one of the embedded types
-	 * @deprecated since 2.3.5 in favor of {@link #isEmbedded(String, String)}
+	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
+	 * {@link #isEmbedded(String, String)}
 	 */
 	@Deprecated
 	public static boolean isEmbedded(String driverClass) {
@@ -151,8 +153,9 @@ public enum EmbeddedDatabaseConnection {
 	 * Convenience method to determine if a given driver class name and url represent an
 	 * embedded database type.
 	 * @param driverClass the driver class
-	 * @param url the jdbc url (can be {@code null)}
+	 * @param url the jdbc url (can be {@code null})
 	 * @return true if the driver class and url refer to an embedded database
+	 * @since 2.4.0
 	 */
 	public static boolean isEmbedded(String driverClass, String url) {
 		if (driverClass == null) {

@@ -49,6 +49,8 @@ class ConfigDataImporter {
 
 	private final Set<ConfigDataResource> loaded = new HashSet<>();
 
+	private final Set<ConfigDataLocation> loadedLocations = new HashSet<>();
+
 	/**
 	 * Create a new {@link ConfigDataImporter} instance.
 	 * @param logFactory the log factory
@@ -73,7 +75,7 @@ class ConfigDataImporter {
 	 * @param locations the locations to resolve
 	 * @return a map of the loaded locations and data
 	 */
-	Map<ConfigDataResource, ConfigData> resolveAndLoad(ConfigDataActivationContext activationContext,
+	Map<ConfigDataResolutionResult, ConfigData> resolveAndLoad(ConfigDataActivationContext activationContext,
 			ConfigDataLocationResolverContext locationResolverContext, ConfigDataLoaderContext loaderContext,
 			List<ConfigDataLocation> locations) {
 		try {
@@ -106,18 +108,23 @@ class ConfigDataImporter {
 		}
 	}
 
-	private Map<ConfigDataResource, ConfigData> load(ConfigDataLoaderContext loaderContext,
+	private Map<ConfigDataResolutionResult, ConfigData> load(ConfigDataLoaderContext loaderContext,
 			List<ConfigDataResolutionResult> candidates) throws IOException {
-		Map<ConfigDataResource, ConfigData> result = new LinkedHashMap<>();
+		Map<ConfigDataResolutionResult, ConfigData> result = new LinkedHashMap<>();
 		for (int i = candidates.size() - 1; i >= 0; i--) {
 			ConfigDataResolutionResult candidate = candidates.get(i);
 			ConfigDataLocation location = candidate.getLocation();
 			ConfigDataResource resource = candidate.getResource();
-			if (this.loaded.add(resource)) {
+			if (this.loaded.contains(resource)) {
+				this.loadedLocations.add(location);
+			}
+			else {
 				try {
 					ConfigData loaded = this.loaders.load(loaderContext, resource);
 					if (loaded != null) {
-						result.put(resource, loaded);
+						this.loaded.add(resource);
+						this.loadedLocations.add(location);
+						result.put(candidate, loaded);
 					}
 				}
 				catch (ConfigDataNotFoundException ex) {
@@ -137,6 +144,10 @@ class ConfigDataImporter {
 
 	private ConfigDataNotFoundAction getNotFoundAction(ConfigDataLocation location) {
 		return (!location.isOptional()) ? this.notFoundAction : ConfigDataNotFoundAction.IGNORE;
+	}
+
+	Set<ConfigDataLocation> getLoadedLocations() {
+		return this.loadedLocations;
 	}
 
 }
